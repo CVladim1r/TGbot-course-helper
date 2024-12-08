@@ -7,7 +7,11 @@ from aiogram.types import (
     Message,
     CallbackQuery
 )
-# from aiogram import F
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.types.input_file import FSInputFile
+
+from aiogram import F
 from config import (
     BOT_TOKEN,
     FIRST_VIDEO,
@@ -16,8 +20,13 @@ from config import (
     START_IMG,
 )
 
+from connection import (
+    log_event,
+    get_metrics
+)
+
 import asyncio
-# import os
+import os
 
 
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
@@ -25,6 +34,8 @@ dp = Dispatcher()
 
 @dp.message(Command("start"))
 async def start_command(message: Message):
+    await log_event(message.from_user.id, message.from_user.username or "unknown", "start_command")
+
     await bot.send_photo(message.chat.id, 
                          photo=START_IMG ,
                          caption="""Я рада тебя приветствовать, моя прекрасная подписчица!""")
@@ -52,6 +63,20 @@ async def start_command(message: Message):
         reply_markup=ease_link_kb()
     )
 
+
+@dp.message(Command("metrics"))
+async def view_metrics(message: Message):
+    metrics = await get_metrics()
+    if metrics:
+        response = "<b>Метрики использования бота:</b>\n\n"
+        for event, usernames in metrics.items():
+            usernames_list = ", ".join(usernames)
+            response += f"<b>{event}:</b> {len(usernames)} уникальных пользователей\n"
+            response += f"<i>Пользователи:</i> {usernames_list}\n\n"
+    else:
+        response = "Нет данных для отображения."
+    await message.reply(response, disable_web_page_preview=True)
+
 # all_media_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'img')
 # video_1_file = os.path.join(all_media_dir, 'video_nub_1.mp4')
 
@@ -61,6 +86,7 @@ async def start_command(message: Message):
 #     print(file_id)
 #     video_id = message.video.file_id
 #     await message.answer(f"ID вашего видео: {video_id}")
+
 
 # @dp.message(Command('send_video'))
 # async def cmd_start(message: types.Message, state: FSMContext):
@@ -109,6 +135,8 @@ async def send_lesson_video(callback_query: types.CallbackQuery):
 
 @dp.callback_query(lambda c: c.data == "get_promocode")
 async def send_promocode(callback_query: CallbackQuery):
+    await log_event(callback_query.from_user.id, callback_query.from_user.username or "unknown", "get_promocode")
+
     await bot.send_message(
         callback_query.message.chat.id, 
         text="""
